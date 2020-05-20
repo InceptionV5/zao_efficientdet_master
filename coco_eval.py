@@ -1,5 +1,3 @@
-# Author: Zylo117
-
 """
 COCO-Style Evaluations
 
