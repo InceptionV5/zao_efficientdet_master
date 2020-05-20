@@ -22,7 +22,6 @@ class CocoDataset(Dataset):
         self.load_classes()
 
     def load_classes(self):
-
         # load class names (name -> label)
         categories = self.coco.loadCats(self.coco.getCatIds())
         categories.sort(key=lambda x: x['id'])

@@ -48,7 +48,7 @@ def get_args():
                         help='Early stopping\'s parameter: minimum change loss to qualify as an improvement')
     parser.add_argument('--es_patience', type=int, default=0,
                         help='Early stopping\'s parameter: number of epochs with no improvement after which training will be stopped. Set to 0 to disable this technique.')
-    parser.add_argument('--data_path', type=str, default='E://污染源识别/all-jpg/chimney/', help='the root folder of dataset')
+    parser.add_argument('--data_path', type=str, default='E://data/Psource', help='the root folder of dataset')
     parser.add_argument('--log_path', type=str, default='logs/')
     parser.add_argument('-w', '--load_weights', type=str, default='../model_saved/efficientdet/efficientdet-d0.pth',
                         help='whether to load weights from a checkpoint, set None to initialize, set \'last\' to load last checkpoint')
