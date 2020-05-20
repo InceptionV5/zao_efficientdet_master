@@ -6,6 +6,8 @@ from torch.utils.data import Dataset, DataLoader
 from pycocotools.coco import COCO
 import cv2
 
+import matplotlib.pylab as plt
+
 
 class CocoDataset(Dataset):
     def __init__(self, root_dir, set='train2017', transform=None):
@@ -38,7 +40,6 @@ class CocoDataset(Dataset):
         return len(self.image_ids)
 
     def __getitem__(self, idx):
-
         img = self.load_image(idx)
         annot = self.load_annotations(idx)
         sample = {'img': img, 'annot': annot}
