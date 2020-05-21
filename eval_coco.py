@@ -25,7 +25,7 @@ from torch_master.zao_efficientdet_master.utils.utils import preprocess, invert_
 ap = argparse.ArgumentParser()
 ap.add_argument('-p', '--project', type=str, default='coco', help='project file that contains parameters')
 ap.add_argument('-c', '--compound_coef', type=int, default=0, help='coefficients of efficientdet')
-ap.add_argument('-w', '--weights', type=str, default=None, help='/path/to/weights')
+ap.add_argument('-w', '--weights', type=str, default='../model_saved/efficientdet/efficientdet-d0.pth', help='')
 ap.add_argument('--nms_threshold', type=float, default=0.5, help='nms threshold, don\'t change it if not for testing purposes')
 ap.add_argument('--cuda', type=bool, default=True)
 ap.add_argument('--device', type=int, default=0)
@@ -60,7 +60,6 @@ def evaluate_coco(img_path, set_name, image_ids, coco, model, threshold=0.05):
     for image_id in tqdm(image_ids):
         image_info = coco.loadImgs(image_id)[0]
         image_path = img_path + image_info['file_name']
-
         ori_imgs, framed_imgs, framed_metas = preprocess(image_path, max_size=input_sizes[compound_coef])
         x = torch.from_numpy(framed_imgs[0])
 
@@ -75,6 +74,9 @@ def evaluate_coco(img_path, set_name, image_ids, coco, model, threshold=0.05):
 
         x = x.unsqueeze(0).permute(0, 3, 1, 2)
         features, regression, classification, anchors = model(x)
+        # regression.shape = [1, 49104, 4]
+        # classification.shape=[1, 49104, 90]
+        # anchors.shape=[1, 49104, 4]
 
         preds = postprocess(x,
                             anchors, regression, classification,
@@ -142,9 +144,11 @@ def _eval(coco_gt, image_ids, pred_json_path):
 
 if __name__ == '__main__':
     SET_NAME = params['val_set']
-    VAL_GT = f'datasets/{params["project_name"]}/annotations/instances_{SET_NAME}.json'
-    VAL_IMGS = f'datasets/{params["project_name"]}/{SET_NAME}/'
-    MAX_IMAGES = 10000
+    root = 'E://data/COCO'
+    VAL_GT = f'{root}/annotations/instances_{SET_NAME}.json'
+    VAL_IMGS = f'{root}/images/{SET_NAME}/'
+
+    MAX_IMAGES = 100
     coco_gt = COCO(VAL_GT)
     image_ids = coco_gt.getImgIds()[:MAX_IMAGES]
     

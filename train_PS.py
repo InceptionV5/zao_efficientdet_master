@@ -30,32 +30,30 @@ class Params:
 
 def get_args():
     parser = argparse.ArgumentParser('Yet Another EfficientDet Pytorch: SOTA object detection network - Zylo117')
-    parser.add_argument('-p', '--project', type=str, default='ps', help='project file that contains parameters')
-    parser.add_argument('-c', '--compound_coef', type=int, default=0, help='coefficients of efficientdet')
+    parser.add_argument('-p', '--project', type=str, default='ps', help='./project里保存模型参数的yml文件')
+    # 选择efficientdet D？
+    parser.add_argument('-c', '--compound_coef', type=int, default=5, help='efficientdet模型系列号(0-6)')
     parser.add_argument('-n', '--num_workers', type=int, default=12, help='num_workers of dataloader')
     parser.add_argument('--batch_size', type=int, default=1, help='The number of images per batch among all devices')
     parser.add_argument('--head_only', type=boolean_string, default=True,
-                        help='whether finetunes only the regressor and the classifier, '
-                             'useful in early stage convergence or small/easy dataset')
+                        help='是否仅微调 regressor 和 classifier 层, 保证在小数据集上快速收敛')
     parser.add_argument('--lr', type=float, default=1e-4)
-    parser.add_argument('--optim', type=str, default='adamw', help='select optimizer for training, '
-                                                                   'suggest using \'admaw\' until the'
-                                                                   ' very final stage then switch to \'sgd\'')
-    parser.add_argument('--num_epochs', type=int, default=500)
+    parser.add_argument('--optim', type=str, default='adamw', help='选择用于训练的优化器，建议开始使用 \'admaw\' 最后一层换为 \'sgd\'')
+    parser.add_argument('--num_epochs', type=int, default=300)
     parser.add_argument('--val_interval', type=int, default=1, help='Number of epoches between valing phases')
-    parser.add_argument('--save_interval', type=int, default=500, help='Number of steps between saving')
+    parser.add_argument('--save_interval', type=int, default=500, help='训练多少次保存模型？')
     parser.add_argument('--es_min_delta', type=float, default=0.0,
                         help='Early stopping\'s parameter: minimum change loss to qualify as an improvement')
     parser.add_argument('--es_patience', type=int, default=0,
                         help='Early stopping\'s parameter: number of epochs with no improvement after which training will be stopped. Set to 0 to disable this technique.')
-    parser.add_argument('--data_path', type=str, default='E://data/Psource', help='the root folder of dataset')
+    parser.add_argument('--data_path', type=str, default='E://data/Psource', help='数据集根目录')
     parser.add_argument('--log_path', type=str, default='logs/')
-    parser.add_argument('-w', '--load_weights', type=str, default='../model_saved/efficientdet/efficientdet-d0.pth',
+    # d?
+    parser.add_argument('-w', '--load_weights', type=str, default='../model_saved/efficientdet/efficientdet-d5.pth',
                         help='whether to load weights from a checkpoint, set None to initialize, set \'last\' to load last checkpoint')
-    parser.add_argument('--saved_path', type=str, default='logs/')
-    parser.add_argument('--debug', type=boolean_string, default=False,
-                        help='whether visualize the predicted boxes of trainging, '
-                             'the output images will be in test/')
+    parser.add_argument('--saved_path', type=str, default='../model_saved', help='模型保存地址')
+    parser.add_argument('--debug', type=boolean_string, default=True,
+                        help='是否可视化训练时模型预测框的输出, 输出图片存储为 test/')
 
     args = parser.parse_args()
     return args
@@ -139,7 +137,7 @@ def train(opt):
             last_step = 0
 
         try:
-            ret = model.load_state_dict(torch.load(weights_path), strict=False)
+            model.load_state_dict(torch.load(weights_path), strict=False)
         except RuntimeError as e:
             print(f'[Warning] Ignoring {e}')
             print('[Warning] Don\'t panic if you see this, this might be because you load a pretrained weights with different number of classes. The rest of the weights should be loaded already.')
@@ -203,7 +201,7 @@ def train(opt):
     num_iter_per_epoch = len(training_generator)
 
     try:
-        for epoch in range(opt.num_epochs):
+        for epoch in range(opt.num_epochs):  # 模型训练
             last_epoch = step // num_iter_per_epoch
             if epoch < last_epoch:
                 continue
@@ -253,7 +251,7 @@ def train(opt):
 
                     step += 1
 
-                    if step % opt.save_interval == 0 and step > 0:
+                    if step % opt.save_interval == 0 and step > 0:  # 每迭代1save_interval次保存一次模型
                         save_checkpoint(model, f'efficientdet-d{opt.compound_coef}_{epoch}_{step}.pth')
                         print('checkpoint...')
 
@@ -263,7 +261,7 @@ def train(opt):
                     continue
             scheduler.step(np.mean(epoch_loss))
 
-            if epoch % opt.val_interval == 0:
+            if epoch % opt.val_interval == 0:   # 模型验证
                 model.eval()
                 loss_regression_ls = []
                 loss_classification_ls = []
@@ -298,7 +296,7 @@ def train(opt):
                 writer.add_scalars('Regression_loss', {'val': reg_loss}, step)
                 writer.add_scalars('Classfication_loss', {'val': cls_loss}, step)
 
-                if loss + opt.es_min_delta < best_loss:
+                if loss + opt.es_min_delta < best_loss:  # 保存历史最低loss得模型
                     best_loss = loss
                     best_epoch = epoch
 
@@ -307,10 +305,10 @@ def train(opt):
                 model.train()
 
                 # Early stopping
-                if epoch - best_epoch > opt.es_patience > 0:
+                if epoch - best_epoch > opt.es_patience > 0:    # 当前epoch与best_epoch差距较大时提前终止
                     print('[Info] Stop training at epoch {}. The lowest loss achieved is {}'.format(epoch, best_loss))
                     break
-    except KeyboardInterrupt:
+    except KeyboardInterrupt:   # 强制退出时保存模型
         save_checkpoint(model, f'efficientdet-d{opt.compound_coef}_{epoch}_{step}.pth')
         writer.close()
     writer.close()
