@@ -17,6 +17,7 @@ from torch_master.zao_efficientdet_master.backbone import EfficientDetBackbone
 
 from tensorboardX import SummaryWriter
 import numpy as np
+import cv2
 from tqdm import tqdm
 
 
@@ -47,7 +48,7 @@ def get_args():
                         help='Early stopping\'s parameter: 定义训练后几个epochs，验证集loss不降就提前终止，0表示禁用此技术。')
     parser.add_argument('--data_path', type=str, default='E://data/Psource', help='数据集根目录')
     parser.add_argument('--log_path', type=str, default='logs/')
-    parser.add_argument('-w', '--load_weights', type=str, default='../model_saved/ps/efficientdet-d' + str(version_net) + '_11_1500.pth',
+    parser.add_argument('-w', '--load_weights', type=str, default='../model_saved/efficientdet-d' + str(version_net) + '.pth',
                         help='whether to load weights from a checkpoint, set None to initialize, set \'last\' to load last checkpoint')
     parser.add_argument('--saved_path', type=str, default='../model_saved', help='模型保存地址')
     parser.add_argument('--debug', type=boolean_string, default=True, help='是否可视化训练时模型预测框的输出, 输出图片存储为 test/')
@@ -78,6 +79,23 @@ class ModelWithLoss(nn.Module):
         else:
             cls_loss, reg_loss = self.criterion(classification, regression, anchors, annotations)
         return cls_loss, reg_loss
+
+cla = ['chimney', 'smoke']
+def show_img_with_anno(img, anno):
+    img = img.squeeze().cpu().numpy()
+    annos = anno.squeeze().cpu().numpy()
+    img = np.transpose(img, (1, 2, 0))
+    img = ((img * (0.229, 0.224, 0.225)) + (0.485, 0.456, 0.406))
+
+    for i in range(annos.shape[0]):
+        box = annos[i][:-1]
+        label = annos[i][4]
+        obj = cla[int(label)]
+        cv2.rectangle(img, (box[0], box[1]), (box[2], box[3]), (255, 255, 0), 2)
+        cv2.putText(img, obj, (int(box[0]), int(box[1]) + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 1)
+
+    cv2.imshow('img', img)
+    cv2.waitKey()
 
 
 def train(opt):
@@ -214,6 +232,7 @@ def train(opt):
                     imgs = data['img']
                     annot = data['annot']
 
+                    # show_img_with_anno(imgs, annot)
                     if params.num_gpus == 1:
                         # if only one gpu, just send it to cuda:0
                         # elif multiple gpus, send it to multiple gpus in CustomDataParallel, not here
