@@ -1,5 +1,5 @@
-import datetime
 import os
+import datetime
 import argparse
 import traceback
 
@@ -29,33 +29,31 @@ class Params:
 
 
 def get_args():
+    version_net = 0  # efficientNet_D?
     parser = argparse.ArgumentParser('Yet Another EfficientDet Pytorch: SOTA object detection network - Zylo117')
     parser.add_argument('-p', '--project', type=str, default='ps', help='./project里保存模型参数的yml文件')
-    # 选择efficientdet D？
-    parser.add_argument('-c', '--compound_coef', type=int, default=5, help='efficientdet模型系列号(0-6)')
-    parser.add_argument('-n', '--num_workers', type=int, default=12, help='num_workers of dataloader')
+    parser.add_argument('-c', '--compound_coef', type=int, default=version_net, help='efficientdet模型系列号(0-7)')
+    parser.add_argument('-n', '--num_workers', type=int, default=0, help='num_workers of dataloader')
     parser.add_argument('--batch_size', type=int, default=1, help='The number of images per batch among all devices')
-    parser.add_argument('--head_only', type=boolean_string, default=True,
-                        help='是否仅微调 regressor 和 classifier 层, 保证在小数据集上快速收敛')
+    parser.add_argument('--head_only', type=boolean_string, default=True, help='是否仅微调 regressor 和 classifier 层, 保证在小数据集上快速收敛')
     parser.add_argument('--lr', type=float, default=1e-4)
     parser.add_argument('--optim', type=str, default='adamw', help='选择用于训练的优化器，建议开始使用 \'admaw\' 最后一层换为 \'sgd\'')
     parser.add_argument('--num_epochs', type=int, default=300)
     parser.add_argument('--val_interval', type=int, default=1, help='Number of epoches between valing phases')
     parser.add_argument('--save_interval', type=int, default=500, help='训练多少次保存模型？')
     parser.add_argument('--es_min_delta', type=float, default=0.0,
-                        help='Early stopping\'s parameter: minimum change loss to qualify as an improvement')
+                        help='Early stopping\'s parameter: 进度提升的最小loss改变量')
     parser.add_argument('--es_patience', type=int, default=0,
-                        help='Early stopping\'s parameter: number of epochs with no improvement after which training will be stopped. Set to 0 to disable this technique.')
+                        help='Early stopping\'s parameter: 定义训练后几个epochs，验证集loss不降就提前终止，0表示禁用此技术。')
     parser.add_argument('--data_path', type=str, default='E://data/Psource', help='数据集根目录')
     parser.add_argument('--log_path', type=str, default='logs/')
-    # d?
-    parser.add_argument('-w', '--load_weights', type=str, default='../model_saved/efficientdet/efficientdet-d5.pth',
+    parser.add_argument('-w', '--load_weights', type=str, default='../model_saved/ps/efficientdet-d' + str(version_net) + '_11_1500.pth',
                         help='whether to load weights from a checkpoint, set None to initialize, set \'last\' to load last checkpoint')
     parser.add_argument('--saved_path', type=str, default='../model_saved', help='模型保存地址')
-    parser.add_argument('--debug', type=boolean_string, default=True,
-                        help='是否可视化训练时模型预测框的输出, 输出图片存储为 test/')
+    parser.add_argument('--debug', type=boolean_string, default=True, help='是否可视化训练时模型预测框的输出, 输出图片存储为 test/')
 
     args = parser.parse_args()
+
     return args
 
 
@@ -74,9 +72,9 @@ class ModelWithLoss(nn.Module):
 
     def forward(self, imgs, annotations, obj_list=None):
         _, regression, classification, anchors = self.model(imgs)
-        if self.debug:
-            cls_loss, reg_loss = self.criterion(classification, regression, anchors, annotations,
-                                                imgs=imgs, obj_list=obj_list)
+        if self.debug:   # 模型输入数据检查
+            cls_loss, reg_loss = self.criterion(classification, regression, anchors,
+                                                annotations, imgs=imgs, obj_list=obj_list)
         else:
             cls_loss, reg_loss = self.criterion(classification, regression, anchors, annotations)
         return cls_loss, reg_loss
@@ -94,7 +92,7 @@ def train(opt):
         torch.manual_seed(42)
 
     opt.saved_path = opt.saved_path + f'/{params.project_name}/'
-    opt.log_path = opt.log_path + f'/{params.project_name}/tensorboard/'
+    opt.log_path = opt.log_path + f'/{params.project_name}/'
     os.makedirs(opt.log_path, exist_ok=True)
     os.makedirs(opt.saved_path, exist_ok=True)
 
@@ -110,7 +108,8 @@ def train(opt):
                   'collate_fn': collater,
                   'num_workers': opt.num_workers}
 
-    input_sizes = [512, 640, 768, 896, 1024, 1280, 1280, 1536]
+    input_sizes = [512, 640, 768, 896, 1024, 1280, 1280, 1536]  # D0-D7不同模版本的输入图像尺寸
+
     training_set = CocoDataset(root_dir=opt.data_path, set=params.train_set,
                                transform=transforms.Compose([Normalizer(mean=params.mean, std=params.std),
                                                              Augmenter(),
@@ -175,7 +174,7 @@ def train(opt):
 
     writer = SummaryWriter(opt.log_path + f'/{datetime.datetime.now().strftime("%Y%m%d-%H%M%S")}/')
 
-    # warp the model with loss function, to reduce the memory usage on gpu0 and speedup
+    # 将模型替换为损失函数，节约内存，加速运算。
     model = ModelWithLoss(model, debug=opt.debug)
 
     if params.num_gpus > 0:
@@ -199,7 +198,6 @@ def train(opt):
     model.train()
 
     num_iter_per_epoch = len(training_generator)
-
     try:
         for epoch in range(opt.num_epochs):  # 模型训练
             last_epoch = step // num_iter_per_epoch
@@ -223,6 +221,7 @@ def train(opt):
                         annot = annot.cuda()
 
                     optimizer.zero_grad()
+
                     cls_loss, reg_loss = model(imgs, annot, obj_list=params.obj_list)
                     cls_loss = cls_loss.mean()
                     reg_loss = reg_loss.mean()
@@ -241,6 +240,7 @@ def train(opt):
                         'Step: {}. Epoch: {}/{}. Iteration: {}/{}. Cls loss: {:.5f}. Reg loss: {:.5f}. Total loss: {:.5f}'.format(
                             step, epoch, opt.num_epochs, iter + 1, num_iter_per_epoch, cls_loss.item(),
                             reg_loss.item(), loss.item()))
+
                     writer.add_scalars('Loss', {'train': loss}, step)
                     writer.add_scalars('Regression_loss', {'train': reg_loss}, step)
                     writer.add_scalars('Classfication_loss', {'train': cls_loss}, step)
@@ -251,7 +251,7 @@ def train(opt):
 
                     step += 1
 
-                    if step % opt.save_interval == 0 and step > 0:  # 每迭代1save_interval次保存一次模型
+                    if step % opt.save_interval == 0 and step > 0:  # 每迭代save_interval次保存一次模型
                         save_checkpoint(model, f'efficientdet-d{opt.compound_coef}_{epoch}_{step}.pth')
                         print('checkpoint...')
 

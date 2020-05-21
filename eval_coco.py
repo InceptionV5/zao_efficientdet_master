@@ -78,10 +78,8 @@ def evaluate_coco(img_path, set_name, image_ids, coco, model, threshold=0.05):
         # classification.shape=[1, 49104, 90]
         # anchors.shape=[1, 49104, 4]
 
-        preds = postprocess(x,
-                            anchors, regression, classification,
-                            regressBoxes, clipBoxes,
-                            threshold, nms_threshold)
+        preds = postprocess(x, anchors, regression, classification,
+                            regressBoxes, clipBoxes, threshold, nms_threshold)
 
         processed_image_ids.append(image_id)
 

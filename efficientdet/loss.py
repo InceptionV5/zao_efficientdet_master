@@ -44,7 +44,6 @@ class FocalLoss(nn.Module):
         anchor_ctr_y = anchor[:, 0] + 0.5 * anchor_heights
 
         for j in range(batch_size):
-
             classification = classifications[j, :, :]
             regression = regressions[j, :, :]
 
@@ -55,7 +54,6 @@ class FocalLoss(nn.Module):
             
             if bbox_annotation.shape[0] == 0:
                 if torch.cuda.is_available():
-                    
                     alpha_factor = torch.ones_like(classification) * alpha
                     alpha_factor = alpha_factor.cuda()
                     alpha_factor = 1. - alpha_factor
@@ -69,7 +67,6 @@ class FocalLoss(nn.Module):
                     regression_losses.append(torch.tensor(0).to(dtype).cuda())
                     classification_losses.append(cls_loss.sum())
                 else:
-                    
                     alpha_factor = torch.ones_like(classification) * alpha
                     alpha_factor = 1. - alpha_factor
                     focal_weight = classification
@@ -168,14 +165,11 @@ class FocalLoss(nn.Module):
             regressBoxes = BBoxTransform()
             clipBoxes = ClipBoxes()
             obj_list = kwargs.get('obj_list', None)
-            out = postprocess(imgs.detach(),
-                              torch.stack([anchors[0]] * imgs.shape[0], 0).detach(), regressions.detach(), classifications.detach(),
-                              regressBoxes, clipBoxes,
-                              0.5, 0.3)
+            out = postprocess(imgs.detach(), torch.stack([anchors[0]] * imgs.shape[0], 0).detach(),
+                              regressions.detach(), classifications.detach(), regressBoxes, clipBoxes, 0.5, 0.3)
             imgs = imgs.permute(0, 2, 3, 1).cpu().numpy()
             imgs = ((imgs * [0.229, 0.224, 0.225] + [0.485, 0.456, 0.406]) * 255).astype(np.uint8)
             imgs = [cv2.cvtColor(img, cv2.COLOR_RGB2BGR) for img in imgs]
             display(out, imgs, obj_list, imshow=False, imwrite=True)
 
-        return torch.stack(classification_losses).mean(dim=0, keepdim=True), \
-               torch.stack(regression_losses).mean(dim=0, keepdim=True)
+        return torch.stack(classification_losses).mean(dim=0, keepdim=True), torch.stack(regression_losses).mean(dim=0, keepdim=True)
